@@ -10,6 +10,7 @@ loop:
 
 message:
 	.string "Hello, World!\n\0"
+	# .string "WK:Hello, World!\n\0"
 
 displayStr:
 	movl 4(%esp), %ebx

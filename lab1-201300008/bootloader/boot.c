@@ -3,6 +3,10 @@
 #define SECTSIZE 512
 
 void bootMain(void) {
+// wk add
+readSect((void*)0x8c00, 1);
+asm("jmp 0x8c00");
+// wk add
 	
 }
 
