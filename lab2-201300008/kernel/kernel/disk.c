@@ -1,22 +1,16 @@
-#include "boot.h"
+#include "x86.h"
+#include "device.h"
 
 #define SECTSIZE 512
 
-void bootMain(void) {
-// wk add
-readSect((void*)0x8c00, 1);
-asm("jmp 0x8c00");
-// wk add
-	
+void waitDisk(void) {
+	while((inByte(0x1F7) & 0xC0) != 0x40); 
 }
 
-void waitDisk(void) { // waiting for disk
-	while((inByte(0x1F7) & 0xC0) != 0x40);
-}
-
-void readSect(void *dst, int offset) { // reading a sector of disk
+void readSect(void *dst, int offset) {
 	int i;
 	waitDisk();
+	
 	outByte(0x1F2, 1);
 	outByte(0x1F3, offset);
 	outByte(0x1F4, offset >> 8);
