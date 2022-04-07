@@ -13,7 +13,9 @@ UOBJS = $(UCFILES:.c=.o) $(LCFILES:.c=.o)
 
 app_print.bin: $(UOBJS)
 	$(LD) $(LDFLAGS) -e main -Ttext 0x00000000 -o app_print.elf $(UOBJS)
-	@../utils/genApp.pl app_print.elf
+	objcopy -S -j .text -O binary app_print.elf app_print.bin
+	@../utils/genApp.pl app_print.bin
 
 clean:
-	rm -rf $(UOBJS) app_print.elf
+	rm -rf $(UOBJS) app_print.elf app_print.bin
+

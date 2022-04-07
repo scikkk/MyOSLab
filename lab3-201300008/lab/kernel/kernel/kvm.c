@@ -86,8 +86,13 @@ void initProc() {
 	asm volatile("movl %0, %%esp"::"m"(pcb[0].stackTop)); // switch to kernel stack for kernel idle process
 	enableInterrupt();
 	asm volatile("int $0x20"); // trigger irqTimer
+	putChar('B'); //额外的运算会让编译器放弃优化这个函数，注释此行可以重现bug
 	while(1) 
+	{
+	
+	putChar('C'); //额外的运算会让编译器放弃优化这个函数，注释此行可以重现bug
 		waitForInterrupt();
+	}
 }
 
 /*

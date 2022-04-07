@@ -20,31 +20,50 @@ void *load_memset(void *dst,unsigned char ch,unsigned len){
 }
 
 void bootMain(void) {
-	int i = 0;
-	int phoff = 0x34;
-	int phnum = 0;
-	unsigned int elf = 0x200000;
+		int i = 0;
+	//int phoff = 0x34;
+	int offset = 0x1000;
+	unsigned int elf = 0x100000;
 	void (*kMainEntry)(void);
-	kMainEntry = (void(*)(void))0x0;
-	struct ProgramHeader *thisph = 0x0;
+	kMainEntry = (void(*)(void))0x100000;
 
 	for (i = 0; i < 200; i++) {
 		readSect((void*)(elf + i*512), 1+i);
 	}
 
 	kMainEntry = (void(*)(void))((struct ELFHeader *)elf)->entry;
-	phoff = ((struct ELFHeader *)elf)->phoff;
-	phnum = ((struct ELFHeader *)elf)->phnum;
+	//phoff = ((struct ELFHeader *)elf)->phoff;
+	//offset = ((struct ProgramHeader *)(elf + phoff))->off;
 
-	for(i = 0; i < phnum; i++){
-		thisph = ((struct ProgramHeader *)(elf + phoff));
-		if(thisph->type == PH_LOAD){
-			load_memcpy((void *)thisph->vaddr, ((void *)elf+thisph->off), thisph->filesz);
-			load_memset((void *)thisph->vaddr+thisph->filesz, 0, thisph->memsz-thisph->filesz);
-		}
+	for (i = 0; i < 200 * 512; i++) {
+		*(unsigned char *)(elf + i) = *(unsigned char *)(elf + i + offset);
 	}
-	
+
 	kMainEntry();
+
+	/* int i = 0; */
+	/* unsigned int elf = 0x100000; */
+	/* void (*kMainEntry)(void); */
+	/* kMainEntry = (void(*)(void))0x0; */
+	/* struct ProgramHeader *thisph = 0x0; */
+
+	/* for (i = 0; i < 200; i++) { */
+	/* 	readSect((void*)(elf + i*512), 1+i); */
+	/* } */
+
+	/* kMainEntry = (void(*)(void))((struct ELFHeader *)elf)->entry; */
+	/* int phoff = ((struct ELFHeader *)elf)->phoff; */
+	/* int phnum = ((struct ELFHeader *)elf)->phnum; */
+
+	/* for(i = 0; i < phnum; i++){ */
+	/* 	thisph = ((struct ProgramHeader *)(elf + phoff)); */
+	/* 	if(thisph->type == PH_LOAD){ */
+	/* 		load_memcpy((void *)thisph->vaddr, ((void *)elf+thisph->off), thisph->filesz); */
+	/* 		load_memset((void *)thisph->vaddr+thisph->filesz, 0, thisph->memsz-thisph->filesz); */
+	/* 	} */
+	/* } */
+	
+	/* kMainEntry(); */
 }
 
 void waitDisk(void) { // waiting for disk

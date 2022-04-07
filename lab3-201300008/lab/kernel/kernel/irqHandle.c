@@ -58,10 +58,54 @@ void GProtectFaultHandle(struct StackFrame *sf) {
 	return;
 }
 
+
 void timerHandle(struct StackFrame *sf){
 	//TODO 完成进程调度，建议使用时间片轮转，按顺序调度
-	
+	uint32_t tmpStackTop;
+	for (int i = 0; i < MAX_PCB_NUM; i++){	
+		if (pcb[i].state == STATE_BLOCKED){
+			pcb[i].sleepTime--;
+			if (pcb[i].sleepTime == 0)
+				pcb[i].state = STATE_RUNNABLE;
+		}
+	}
+	/* pcb[current].state = STATE_RUNNING; */
+	if (pcb[current].state != STATE_RUNNING ||
+			++(pcb[current].timeCount) >= MAX_TIME_COUNT){
+		int nxt = 0;
+		for (int i = 1; i < MAX_PCB_NUM; i++){	
+			if (pcb[i].state == STATE_RUNNABLE){
+				nxt = i;
+				break;
+			}
+		}
+		if (nxt != current){
+			pcb[nxt].state = STATE_RUNNING;
+			if (pcb[current].state == STATE_RUNNING){
+				pcb[current].state = STATE_RUNNABLE;
+			}
+			pcb[current].timeCount = 0;
+
+			current = nxt;
+
+			tmpStackTop = pcb[current].stackTop;
+			pcb[current].stackTop = pcb[current].prevStackTop;
+			tss.esp0 = (uint32_t)&(pcb[current].stackTop);
+			asm volatile("movl %0, %%esp" ::"m"(tmpStackTop));
+			asm volatile("popl %gs");
+			asm volatile("popl %fs");
+			asm volatile("popl %es");
+			asm volatile("popl %ds");
+			asm volatile("popal");
+			asm volatile("addl $8, %esp");
+			/* putChar('D'); */
+			asm volatile("iret");
+		}
+
+	}
 }
+
+
 
 
 void syscallHandle(struct StackFrame *sf) {
@@ -69,7 +113,7 @@ void syscallHandle(struct StackFrame *sf) {
 		case 0:
 			syscallWrite(sf);
 			break; // for SYS_WRITE
-		/* Add Fork,Sleep... */
+			/* Add Fork,Sleep... */
 		case 1:
 			syscallFork(sf);
 			break;
@@ -130,11 +174,11 @@ void syscallPrint(struct StackFrame *sf) {
 				}
 			}
 		}
-		
+
 	}
-	
+
 	updateCursor(displayRow, displayCol);
-	
+
 	sf->eax=size;
 	return;
 }	
@@ -149,16 +193,32 @@ void syscallFork(struct StackFrame *sf){
 	//TODO 完善它
 
 	//TODO 查找空闲pcb，如果没有就返回-1
-	int i=0;
+	int i = 0;
+	for(; i <= MAX_PCB_NUM; i++){
+		if(i == MAX_PCB_NUM) {
+			pcb[current].regs.eax = -1;
+			return;
+		}
+		if(pcb[i].state == STATE_DEAD){
+			break;
+		}
+	}
 
 
 
 	//TODO 拷贝地址空间
 
-
+	enableInterrupt();
+	for (int j = 0; j < 0x100000; j++)
+	{
+		*(uint8_t *)(j + (i + 1) * 0x100000) = *(uint8_t *)(j + (current + 1) * 0x100000);
+		if (!(j % 0x100))
+			asm volatile("int $0x20");
+	}
+	disableInterrupt();
 	// 拷贝pcb，这部分代码给出了，请注意理解
 	memcpy(&pcb[i],&pcb[current],sizeof(ProcessTable));
-	
+
 	pcb[i].regs.eax = 0;
 	pcb[i].regs.cs = USEL(1 + i * 2);
 	pcb[i].regs.ds = USEL(2 + i * 2);
@@ -171,25 +231,40 @@ void syscallFork(struct StackFrame *sf){
 	pcb[i].state = STATE_RUNNABLE;
 	pcb[i].timeCount = 0;
 	pcb[i].sleepTime = 0;
+	pcb[current].regs.eax = i;
 }	
 
 
 void syscallExec(struct StackFrame *sf) {
 	// TODO 完成exec
 	// hint: 用loadelf，已经封装好了
+	/* uint32_t entry = 0; */
+	/* uint32_t secstart = 0; */
+	/* uint32_t secnum =  0; */
+
 	uint32_t entry = 0;
-	uint32_t secstart = 0;
-	uint32_t secnum =  0;
-	
+	loadelf(sf->ecx, sf->edx, (uint32_t)((current + 1) * 0x100000), &entry);
+	sf->eip = entry;
 }
 
 
 void syscallSleep(struct StackFrame *sf){
 	//TODO:实现它
-
+	if(sf->ecx <= 0) return;
+	pcb[current].state = STATE_BLOCKED;
+	pcb[current].sleepTime = sf->ecx;
+	asm volatile("int $0x20");
+	/* int time = sf->ecx; */
+	/* if(time >= 0){ */
+	/* 	pcb[current].sleepTime = time; */
+	/* 	pcb[current].state = STATE_BLOCKED; */
+	/* 	asm volatile("int $0x20"); */
+	/* } */
 }	
 
 void syscallExit(struct StackFrame *sf){
 	//TODO 先设置成dead，然后用int 0x20进入调度
-
+	pcb[current].state = STATE_DEAD;
+	//pcb[current].timeCount = MAX_TIME_COUNT;
+	asm volatile("int $0x20");
 }
