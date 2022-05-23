@@ -22,18 +22,17 @@ asm [volatile] (AssemblerTemplate : : InputOperands : Clobbers : GotoLabels)
 */
 void initSeg() { // setup kernel segements
 	int i;
-	//gdt[1] and gdt[2]
+
 	gdt[SEG_KCODE] = SEG(STA_X | STA_R, 0,       0xffffffff, DPL_KERN);
 	gdt[SEG_KDATA] = SEG(STA_W,         0,       0xffffffff, DPL_KERN);
 
-	//user processes' gdt
 	for (i = 1; i < MAX_PCB_NUM; i++) {
 		gdt[1+i*2] = SEG(STA_X | STA_R, (i+1)*0x100000,0x00100000, DPL_USER);
 		gdt[2+i*2] = SEG(STA_W,         (i+1)*0x100000,0x00100000, DPL_USER);
 	}
 	
 	gdt[SEG_TSS] = SEG16(STS_T32A,      &tss, sizeof(TSS)-1, DPL_KERN);
-	gdt[SEG_TSS].s = 0;//system
+	gdt[SEG_TSS].s = 0;
 
 	setGdt(gdt, sizeof(gdt)); // gdt is set in bootloader, here reset gdt in kernel
 
@@ -49,10 +48,10 @@ void initSeg() { // setup kernel segements
 	
 }
 
-uint32_t loadUMain();
+uint32_t loadUMain(void);
 
 void initProc() {
-	int i = 0;
+	int i;
 	for (i = 0; i < MAX_PCB_NUM; i++) {
 		pcb[i].state = STATE_DEAD;
 	}
@@ -86,13 +85,9 @@ void initProc() {
 	asm volatile("movl %0, %%esp"::"m"(pcb[0].stackTop)); // switch to kernel stack for kernel idle process
 	enableInterrupt();
 	asm volatile("int $0x20"); // trigger irqTimer
-	putChar('B'); //额外的运算会让编译器放弃优化这个函数，注释此行可以重现bug
-	while(1) 
-	{
-	
-	/* putChar('C'); //额外的运算会让编译器放弃优化这个函数，注释此行可以重现bug */
+	putChar('a');
+	while(1)
 		waitForInterrupt();
-	}
 }
 
 /*
@@ -102,52 +97,23 @@ user program is loaded to location 0x200000, i.e., 2MB
 size of user program is not greater than 200*512 bytes, i.e., 100KB
 */
 
-//自己编的memcpy
-void *loadmemcpy(void *dst,void *src,unsigned len){
+uint32_t loadUMain(void) {
 	int i = 0;
-	for(i = 0; i < len; i++){
-		*((unsigned char *)(dst+i)) = *((unsigned char *)(src+i));
+	int phoff = 0x34; // program header offset
+	int offset = 0x1000; // .text section offset
+	uint32_t elf = 0x200000; // physical memory addr to load
+	uint32_t uMainEntry = 0x200000;
+
+	for (i = 0; i < 200; i++) {
+		readSect((void*)(elf + i*512), 201+i);
 	}
-	return dst;
-}
-
-//自己编的memset
-void *loadmemset(void *dst,unsigned char ch,unsigned len){
-	int i = 0;
-	for(i = 0; i < len; i++){
-		*((unsigned char *)(dst+i)) = ch;
-	}
-	return dst;
-}
-
-//把elf文件加载到Pysaddr开始的地址，即将加载的程序以编号为Secstart的扇区开始，占据Secnum个扇区（LBA），传入的entry是个指针
-int loadelf(uint32_t Secstart, uint32_t Secnum,uint32_t Pysaddr,uint32_t *entry){
-	int i = 0;
-	int phoff = 0x34;
-	int phnum = 0;
-	unsigned int elf = Pysaddr + 0x80000;
-	struct ProgramHeader *thisph = 0x0;
-
-	for (i = 0; i < Secnum; i++) {
-		readSect((void*)(elf + i*512), Secstart + i);
-	}
-
-	*entry = (uint32_t)((struct ELFHeader *)elf)->entry;
+	
+	uMainEntry = ((struct ELFHeader *)elf)->entry; // entry address of the program
 	phoff = ((struct ELFHeader *)elf)->phoff;
-	phnum = ((struct ELFHeader *)elf)->phnum;
-	for(i = 0; i < phnum; i++){
-		thisph = ((struct ProgramHeader *)(elf + phoff) + i);
-		if(thisph->type == PT_LOAD){
-			loadmemcpy((void *)Pysaddr + thisph->vaddr, ((void *)elf+thisph->off), thisph->filesz);
-			loadmemset((void *)Pysaddr + thisph->vaddr+thisph->filesz, 0, thisph->memsz-thisph->filesz);
-		}
-	}
-	return 0;
-}
+	offset = ((struct ProgramHeader *)(elf + phoff))->off;
 
-uint32_t loadUMain(){
-	uint32_t entry = 0;
-	loadelf(201, 20, 0x200000, &entry);
-	putChar('A'); //额外的运算会让编译器放弃优化这个函数，注释此行可以重现bug
-	return entry;
+	for (i = 0; i < 200 * 512; i++) {
+		*(uint8_t *)(elf + i) = *(uint8_t *)(elf + i + offset);
+	}
+	return uMainEntry;
 }

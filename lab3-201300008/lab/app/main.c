@@ -14,6 +14,7 @@ int uEntry(void) {
 			i --;
 			printf("Child Process: Pong %d, %d;\n", data, i);
 			sleep(60);
+	/* printf("h\nh\nh\nh\nh\n"); */
 		}
 		exec(221, 20);
 		exit();
@@ -24,6 +25,7 @@ int uEntry(void) {
 			i --;
 			printf("Father Process: Ping %d, %d;\n", data, i);
 			sleep(60);
+	/* printf("h\nh\nh\nh\nh\n"); */
 		}
 		exit();
 	}

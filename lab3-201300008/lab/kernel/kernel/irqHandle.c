@@ -60,7 +60,7 @@ void GProtectFaultHandle(struct StackFrame *sf) {
 
 
 void timerHandle(struct StackFrame *sf){
-	//TODO 完成进程调度，建议使用时间片轮转，按顺序调度
+	//wk: 完成进程调度，建议使用时间片轮转，按顺序调度
 	uint32_t tmpStackTop;
 	for (int i = 0; i < MAX_PCB_NUM; i++){	
 		if (pcb[i].state == STATE_BLOCKED){
@@ -190,9 +190,7 @@ void memcpy(void* dst,void* src,size_t size){
 }
 
 void syscallFork(struct StackFrame *sf){
-	//TODO 完善它
-
-	//TODO 查找空闲pcb，如果没有就返回-1
+	//wk: 查找空闲pcb，如果没有就返回-1
 	int i = 0;
 	for(; i <= MAX_PCB_NUM; i++){
 		if(i == MAX_PCB_NUM) {
@@ -203,16 +201,12 @@ void syscallFork(struct StackFrame *sf){
 			break;
 		}
 	}
-
-
-
-	//TODO 拷贝地址空间
-
+	//wk: 拷贝地址空间
 	enableInterrupt();
 	for (int j = 0; j < 0x100000; j++)
 	{
 		*(uint8_t *)(j + (i + 1) * 0x100000) = *(uint8_t *)(j + (current + 1) * 0x100000);
-		if (!(j % 0x100))
+		if (!(j % 0x10000))
 			asm volatile("int $0x20");
 	}
 	disableInterrupt();
@@ -236,7 +230,7 @@ void syscallFork(struct StackFrame *sf){
 
 
 void syscallExec(struct StackFrame *sf) {
-	// TODO 完成exec
+	// wk: 完成exec
 	// hint: 用loadelf，已经封装好了
 	/* uint32_t entry = 0; */
 	/* uint32_t secstart = 0; */
@@ -249,22 +243,16 @@ void syscallExec(struct StackFrame *sf) {
 
 
 void syscallSleep(struct StackFrame *sf){
-	//TODO:实现它
-	if(sf->ecx <= 0) return;
-	pcb[current].state = STATE_BLOCKED;
-	pcb[current].sleepTime = sf->ecx;
-	asm volatile("int $0x20");
-	/* int time = sf->ecx; */
-	/* if(time >= 0){ */
-	/* 	pcb[current].sleepTime = time; */
-	/* 	pcb[current].state = STATE_BLOCKED; */
-	/* 	asm volatile("int $0x20"); */
-	/* } */
+	//wk: 实现它
+	if(sf->ecx >= 0){
+		pcb[current].sleepTime = sf->ecx;
+		pcb[current].state = STATE_BLOCKED;
+		asm volatile("int $0x20");
+	}
 }	
 
 void syscallExit(struct StackFrame *sf){
-	//TODO 先设置成dead，然后用int 0x20进入调度
+	//wk: 先设置成dead，然后用int 0x20进入调度
 	pcb[current].state = STATE_DEAD;
-	//pcb[current].timeCount = MAX_TIME_COUNT;
 	asm volatile("int $0x20");
 }
